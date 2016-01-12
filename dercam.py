@@ -12,29 +12,34 @@ import numpy as np
 import os
 import math
 
+# Takes DOE data and converts to DERCAM data for specified aspects. For "aspect" see "aspectname" below
+# Example of an input file: hospital-JacksonMS.csv
+# Output: The five files in the folder JacksonMS-totalelectricity-DERCAM are written out
 buildingname = 'hospital'
 location = 'JacksonMS'
-aspectname = 'totalelectricity'
-relevant_columns = [1,2,3,5,6]
-signs = [1,1,1,1,1] #coefficients for linear combinations of the columns
-year = 2005
-coefficient = float(1) #threshold coefficient
+aspectname = 'totalelectricity' # A name for the thing of interest
+relevant_columns = [1,2,3,5,6]  # Column A is indexed zero. These columns are relevant to the aspectname.
+signs = [1,1,1,1,1]             # Coefficients for linear combinations of the columns
+year = 2005                     # Determined in part manually
+coefficient = float(1)          # Threshold coefficient t. Daily loads greater than (t*sigma)
+                                #   are flagged as "peak".
 
-"""Creating the target folders for all the processed files"""
-
+"""Creating the target folders for all the processed files """
+# Creating ./hospital-JacksonMS and folder ./hospital-JacksonMS/JacksonMS-totalelectricity-DERCAM/.
+# These folders are created if they do not already exist.
 targetfolder = './%s-%s/%s-%s-DERCAM/' %(buildingname,location,location,aspectname)
 if not os.path.exists(os.path.dirname(targetfolder)):
     os.makedirs(os.path.dirname(targetfolder))
 
 """Creating the canonical form that isolates the particular aspect and gives a 24 hour profile for each day"""
-
+# Creates file canonicalform-totalelectricity.csv inside of targetfolder
 with open(targetfolder + 'canonicalform-%s.csv' %aspectname,'wb') as process:
-    processWriter = csv.writer(process)
-    with open('%s-%s.csv' %(buildingname,location),'r') as data:
-        dataReader = csv.reader(data)
-        header = next(dataReader)
-        processWriter.writerow(['Date', 'Hour 1']+range(25)[2:]) #Date and hours
-        row = next(dataReader,None) #first data
+    processWriter = csv.writer(process) # Set up for writing as a csv file. Lists can be written as comma-delimited rows. 
+    with open('%s-%s.csv' %(buildingname,location),'r') as data: #
+        dataReader = csv.reader(data)   # Reads in the entire file
+        header = next(dataReader)       # Reads the header row as a list header[0], header[1], ...
+        processWriter.writerow(['Date', 'Hour 1']+range(25)[2:]) # Date and hours written as column headers
+        row = next(dataReader,None)     # Reads the first data row
         
         while True:
             fullday = [] #24 profile for a day
@@ -47,9 +52,9 @@ with open(targetfolder + 'canonicalform-%s.csv' %aspectname,'wb') as process:
             
             dateobj = datetime.date(year,int(month),int(day))
             
-            fullday.append(date) #day and month
+            fullday.append(date)    # fullday will be the entire row being written. Date appended here.
             while row[0].split()[0] == date:  #while we're in the same date
-                targetvalue = 0
+                targetvalue = 0 # targetvalue will be the linear combination of the relevant columns in this row
                 for (sign,i) in zip(signs,relevant_columns):
                     targetvalue += sign*float(row[i])
                 fullday.append(targetvalue) #append the hourly information
@@ -59,6 +64,9 @@ with open(targetfolder + 'canonicalform-%s.csv' %aspectname,'wb') as process:
             
             fullday.append(dateobj.strftime('%a'))
             processWriter.writerow(fullday)
+            
+# The canonicalform is now all done and written out.           
+            
 
 """ From 365 profiles, find a profile for each month. Repeat for typical weekday profile, weekend profile, peakday profile"""
 with open(targetfolder + 'weekdayprocess-%s.csv' %aspectname,'wb') as weekdayprocess, open(targetfolder + 'weekendprocess-%s.csv' %aspectname,'wb') as weekendprocess, open(targetfolder + 'peakdayprocess-%s.csv' %aspectname,'wb') as peakdayprocess:
@@ -131,7 +139,9 @@ with open(targetfolder + 'weekdayprocess-%s.csv' %aspectname,'wb') as weekdaypro
 with open(targetfolder + 'dercamprocess-%s.csv' %aspectname,'wb') as dercamsheet:
     dercamsheetWriter = csv.writer(dercamsheet)
     dercamsheetWriter.writerow(['Month'] + range(25)[1:])
-    with open(targetfolder + 'weekdayprocess-%s.csv' %aspectname,'r') as weekprocess, open(targetfolder + 'weekendprocess-%s.csv' %aspectname,'r') as weekendprocess, open(targetfolder + 'peakdayprocess-%s.csv' %aspectname,'r') as peakdayprocess:
+    with open(targetfolder + 'weekdayprocess-%s.csv' %aspectname,'r') as weekprocess, \
+        open(targetfolder + 'weekendprocess-%s.csv' %aspectname,'r') as weekendprocess, \
+        open(targetfolder + 'peakdayprocess-%s.csv' %aspectname,'r') as peakdayprocess:
         weekprocessReader = csv.reader(weekprocess)
         weekendprocessReader = csv.reader(weekendprocess)
         peakdayprocessReader = csv.reader(peakdayprocess)
